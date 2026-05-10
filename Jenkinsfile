@@ -112,7 +112,7 @@ pipeline{
             }
         }
 
-        tage('Trivy OS Scan') {
+        stage('Trivy OS Scan') {
             steps {
                 script {
                     // Generate table report
