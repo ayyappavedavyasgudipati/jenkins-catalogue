@@ -43,6 +43,14 @@ pipeline{
             }
         }
 
+        stage ('Unit Test Cases'){
+            steps{
+                script {
+                    sh """ npm test """
+                }          
+            }
+        }
+
         stage ('Build Image'){
             steps{
                 script {
@@ -57,6 +65,8 @@ pipeline{
                 }          
             }
         }
+
+        
         
     }
 
