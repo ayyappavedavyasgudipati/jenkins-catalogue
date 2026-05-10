@@ -51,6 +51,52 @@ pipeline{
             }
         }
 
+        stage('Dependabot Alerts Check') {
+            steps {
+                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                    script {
+                        def owner = 'ayyappavedavyasgudipati'
+                        def repo  = 'jenkins-catalogue'
+
+                        def response = sh(
+                            script: """
+                                curl -L \
+                                    -H "Accept: application/vnd.github+json" \
+                                    -H "Authorization: ${GITHUB_TOKEN} \
+                                    -H "X-GitHub-Api-Version: 2026-03-10" \
+                                    https://api.github.com/repos/ayyappavedavyasgudipati/jenkins-catalogue/dependabot/alerts
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        def parts      = response.tokenize('\n')
+                        def httpStatus = parts[-1].trim()
+                        def body       = parts[0..-2].join('\n')
+
+                        if (httpStatus != '200') {
+                            error "GitHub API call failed with HTTP ${httpStatus}. Check token permissions (security_events scope required).\nResponse: ${body}"
+                        }
+
+                        def alerts = readJSON text: body
+
+                        if (alerts.size() == 0) {
+                            echo "✅ No HIGH or CRITICAL Dependabot alerts found. Pipeline continues."
+                        } else {
+                            echo "🚨 Found ${alerts.size()} HIGH/CRITICAL Dependabot alert(s):"
+                            alerts.each { alert ->
+                                def pkg      = alert.security_vulnerability?.package?.name ?: 'unknown'
+                                def severity = alert.security_advisory?.severity?.toUpperCase() ?: 'UNKNOWN'
+                                def summary  = alert.security_advisory?.summary ?: 'No summary'
+                                def fixedIn  = alert.security_vulnerability?.first_patched_version?.identifier ?: 'No fix available'
+                                echo "  ❌ [${severity}] ${pkg} — ${summary} (Fixed in: ${fixedIn})"
+                            }
+                            error "Pipeline failed: ${alerts.size()} HIGH/CRITICAL Dependabot alert(s) detected."
+                        }
+                    }
+                }
+            }
+        }
+
         stage ('Build Image'){
             steps{
                 script {
